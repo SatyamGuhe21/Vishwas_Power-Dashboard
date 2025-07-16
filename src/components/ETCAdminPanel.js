@@ -67,6 +67,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
           companies: 3,
           createdAt: "2024-01-15",
           departmentId: 1,
+          parentId: null, // Top-level project
         },
         {
           id: 2,
@@ -76,6 +77,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
           companies: 3,
           createdAt: "2024-02-01",
           departmentId: 2,
+          parentId: null, // Top-level project
         },
         {
           id: 3,
@@ -85,6 +87,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
           companies: 3,
           createdAt: "2024-02-15",
           departmentId: 3,
+          parentId: null, // Top-level project
         },
       ]
       setProjects(defaultProjects)
@@ -371,20 +374,21 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
   const handleCreateProject = () => {
     if (newProject.name && newProject.description && selectedDepartment) {
       const projectId = Math.max(...projects.map((p) => p.id), 0) + 1
+      const parentId = selectedProject ? selectedProject.id : null // Determine if it's a sub-project
 
       const project = {
         id: projectId,
         name: newProject.name,
         description: newProject.description,
         status: "active",
-        companies: 3,
+        companies: 3, // Still assume 3 companies for any new project/sub-project
         createdAt: new Date().toISOString().split("T")[0],
         departmentId: selectedDepartment.id,
+        parentId: parentId, // Assign parentId
       }
 
-      setProjects([...projects, project])
+      setProjects((prevProjects) => [...prevProjects, project])
 
-      // Automatically add TCS, IBM, HCL companies for this project
       const newCompanies = [
         {
           id: Math.max(...companies.map((c) => c.id), 0) + 1,
@@ -424,17 +428,51 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
         },
       ]
 
-      setCompanies([...companies, ...newCompanies])
+      setCompanies((prevCompanies) => [...prevCompanies, ...newCompanies])
+
+      // Generate initial placeholder forms for Stage 1 for each new company
+      const initialForms = newCompanies.flatMap((company) => [
+        {
+          id: Math.max(...submittedForms.map((f) => f.id), 0) + 100 + company.id * 10 + 1, // Unique ID
+          companyId: company.id,
+          stage: 1,
+          formName: "Initial Technical Form (Placeholder)",
+          submittedAt: "N/A", // Not actually submitted yet
+          status: "not-submitted", // Custom status for placeholders
+          data: {
+            note: "This is a placeholder form. Actual data will appear upon submission.",
+            status: "Pending Company Input",
+          },
+        },
+        {
+          id: Math.max(...submittedForms.map((f) => f.id), 0) + 100 + company.id * 10 + 2, // Unique ID
+          companyId: company.id,
+          stage: 1,
+          formName: "Initial Compliance Form (Placeholder)",
+          submittedAt: "N/A",
+          status: "not-submitted",
+          data: {
+            note: "This is a placeholder form. Actual data will appear upon submission.",
+            status: "Pending Company Input",
+          },
+        },
+      ])
+      setSubmittedForms((prev) => [...prev, ...initialForms])
+
       setNewProject({ name: "", description: "" })
       setShowCreateForm(false)
       alert(
         `Project "${project.name}" created successfully in ${selectedDepartment.name} with TCS, IBM, and HCL companies!`,
       )
+      // Automatically navigate to the newly created project's view
+      onProjectSelect(project)
     }
   }
 
   const handleReviewStage = (company, stage) => {
-    const stageForms = submittedForms.filter((form) => form.companyId === company.id && form.stage === stage)
+    const stageForms = submittedForms.filter(
+      (form) => form.companyId === company.id && form.stage === stage && form.status !== "not-submitted",
+    )
 
     if (stageForms.length === 0) {
       alert(`No forms submitted for Stage ${stage} yet.`)
@@ -447,10 +485,10 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
   }
 
   const handleApproveStage = (stage) => {
-    // Approve all forms in the current stage
+    // Approve all forms in the current stage that are not 'not-submitted'
     setSubmittedForms((forms) =>
       forms.map((form) =>
-        form.companyId === selectedCompanyForReview.id && form.stage === stage
+        form.companyId === selectedCompanyForReview.id && form.stage === stage && form.status !== "not-submitted"
           ? { ...form, status: "approved", reviewedAt: new Date().toISOString().split("T")[0] }
           : form,
       ),
@@ -480,10 +518,10 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
     const rejectionReason = prompt("Please provide a reason for rejecting this stage:")
     if (!rejectionReason) return
 
-    // Reject all forms in the current stage
+    // Reject all forms in the current stage that are not 'not-submitted'
     setSubmittedForms((forms) =>
       forms.map((form) =>
-        form.companyId === selectedCompanyForReview.id && form.stage === stage
+        form.companyId === selectedCompanyForReview.id && form.stage === stage && form.status !== "not-submitted"
           ? {
               ...form,
               status: "rejected",
@@ -514,7 +552,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
   const handleViewSubmittedForms = (company) => {
     const companyForms = submittedForms.filter((form) => form.companyId === company.id)
     if (companyForms.length === 0) {
-      alert("No forms submitted yet.")
+      alert("No forms available for this company yet.")
       return
     }
 
@@ -537,6 +575,8 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
         return "status-progress"
       case "pending-approval":
         return "status-pending"
+      case "not-submitted": // New status for placeholder forms
+        return "status-default"
       default:
         return "status-default"
     }
@@ -549,19 +589,25 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
     return "locked"
   }
 
-  const filteredProjects = selectedDepartment
+  // Filter top-level projects for department view
+  const filteredTopLevelProjects = selectedDepartment
     ? projects.filter(
         (project) =>
           project.departmentId === selectedDepartment.id &&
+          !project.parentId && // Only show top-level projects
           project.name.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     : []
 
-  const projectCompanies = selectedProject
-    ? companies.filter((company) => company.projectId === selectedProject.id)
-    : []
+  // Filter companies directly associated with the selected project
+  const directCompanies = selectedProject ? companies.filter((company) => company.projectId === selectedProject.id) : []
+
+  // Filter sub-projects of the selected project
+  const subProjects = selectedProject ? projects.filter((project) => project.parentId === selectedProject.id) : []
 
   const getDepartmentProjects = (departmentId) => {
+    // This function now returns all projects (top-level and sub-projects) for a department
+    // It's used for the count in the department card
     return projects.filter((project) => project.departmentId === departmentId)
   }
 
@@ -595,6 +641,11 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
   }
 
   const handleSimulateFormSubmission = (companyId, stage) => {
+    // Remove any existing 'not-submitted' placeholder forms for this company and stage
+    setSubmittedForms((prev) =>
+      prev.filter((form) => !(form.companyId === companyId && form.stage === stage && form.status === "not-submitted")),
+    )
+
     const newForms = [
       {
         id: Math.max(...submittedForms.map((f) => f.id), 0) + 1,
@@ -633,6 +684,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
           ? {
               ...company,
               status: "pending-approval",
+              formsCompleted: company.formsCompleted + newForms.length, // Increment forms completed
               submittedStages: { ...company.submittedStages, [stage]: true },
               lastActivity: new Date().toISOString().split("T")[0],
             }
@@ -669,7 +721,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                   : showSubmitterReview
                     ? `Submitted Forms - ${selectedCompanyForReview.name}`
                     : selectedProject
-                      ? `${selectedProject.name} - Companies`
+                      ? `${selectedProject.name} - ${selectedProject.parentId ? "Sub-Projects & Companies" : "Companies"}`
                       : selectedDepartment
                         ? `${selectedDepartment.name} - Projects`
                         : "ETC Admin Panel"}
@@ -680,7 +732,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                   : showSubmitterReview
                     ? "View all submitted forms by company"
                     : selectedProject
-                      ? "Manage companies and workflows"
+                      ? `Manage ${selectedProject.parentId ? "sub-projects and companies" : "companies and workflows"}`
                       : selectedDepartment
                         ? "Manage projects in department"
                         : "Manage departments, projects and companies"}
@@ -760,12 +812,15 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                           ? "status-completed"
                           : form.status === "rejected"
                             ? "status-pending"
-                            : "status-progress"
+                            : form.status === "not-submitted"
+                              ? "status-default" // Placeholder status
+                              : "status-progress"
                       }`}
                     >
                       {form.status === "approved" && "✅ Approved"}
                       {form.status === "rejected" && "❌ Rejected"}
                       {form.status === "pending-review" && "⏳ Pending Review"}
+                      {form.status === "not-submitted" && "⚪ Not Submitted"}
                     </span>
                   </div>
 
@@ -849,6 +904,12 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                   <h4>Rejected</h4>
                   <div className="stat-number">{allCompanyForms.filter((f) => f.status === "rejected").length}</div>
                 </div>
+                <div className="stat-card">
+                  <h4>Not Submitted</h4>
+                  <div className="stat-number">
+                    {allCompanyForms.filter((f) => f.status === "not-submitted").length}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -871,12 +932,15 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                                   ? "status-completed"
                                   : form.status === "rejected"
                                     ? "status-pending"
-                                    : "status-progress"
+                                    : form.status === "not-submitted"
+                                      ? "status-default" // Placeholder status
+                                      : "status-progress"
                               }`}
                             >
                               {form.status === "approved" && "✅ Approved"}
                               {form.status === "rejected" && "❌ Rejected"}
                               {form.status === "pending-review" && "⏳ Pending Review"}
+                              {form.status === "not-submitted" && "⚪ Not Submitted"}
                             </span>
                           </div>
 
@@ -955,7 +1019,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
             </div>
           </>
         ) : !selectedProject ? (
-          // Projects View for Selected Department
+          // Projects View for Selected Department (shows top-level projects)
           <>
             <div className="section-header">
               <div>
@@ -1024,7 +1088,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
             )}
 
             <div className="projects-grid">
-              {filteredProjects.map((project) => (
+              {filteredTopLevelProjects.map((project) => (
                 <div key={project.id} className="project-card" onClick={() => onProjectSelect(project)}>
                   <div className="project-header">
                     <div className="project-icon" style={{ backgroundColor: selectedDepartment.color }}>
@@ -1043,149 +1107,231 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
             </div>
           </>
         ) : (
-          // Companies View for Selected Project
+          // Companies & Sub-Projects View for Selected Project
           <>
             <div className="section-header">
               <div>
-                <h2>Companies in {selectedProject.name}</h2>
-                <p>Manage companies and their workflows</p>
+                <h2>Contents of {selectedProject.name}</h2>
+                <p>Manage sub-projects and companies within this project</p>
               </div>
-              <button onClick={() => onProjectSelect(null)} className="back-btn">
-                ← Back to Projects
-              </button>
+              <div className="section-actions">
+                {/* This button now creates a sub-project */}
+                <button onClick={() => setShowCreateForm(true)} className="create-btn">
+                  ➕ Create New Sub-Project
+                </button>
+                <button onClick={() => onProjectSelect(null)} className="back-btn">
+                  ← Back to {selectedProject.parentId ? "Parent Project" : "Projects"}
+                </button>
+              </div>
             </div>
 
-            <div className="companies-grid">
-              {projectCompanies.map((company) => (
-                <div key={company.id} className="company-card">
-                  <div className="company-header">
-                    <div className="company-icon" style={{ backgroundColor: "#1E3A8A" }}>
-                      🏢
-                    </div>
-                    <span className={`status-badge ${getStatusColor(company.status)}`}>
-                      {company.status === "pending-approval" && "⏳"}
-                      {company.status === "in-progress" && "🔄"}
-                      {company.status === "completed" && "✅"}
-                      {company.status}
-                    </span>
+            {showCreateForm && (
+              <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <img src="/logo.png" alt="Vishvas Power" className="logo-small" />
+                    <h3>Create New Sub-Project in {selectedProject.name}</h3>
                   </div>
-                  <h3>{company.name}</h3>
-                  <p>
-                    Stage {company.stage} • {company.formsCompleted}/{company.totalForms} forms completed
-                  </p>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${(company.formsCompleted / company.totalForms) * 100}%` }}
-                    ></div>
+                  <p>TCS, IBM, and HCL will be automatically added to this sub-project</p>
+                  <div className="form-group">
+                    <label>Sub-Project Name</label>
+                    <input
+                      type="text"
+                      placeholder="Enter sub-project name"
+                      value={newProject.name}
+                      onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                    />
                   </div>
-                  <div className="company-footer">
-                    <span>📊 {Math.round((company.formsCompleted / company.totalForms) * 100)}% complete</span>
-                    <span>📅 {company.lastActivity}</span>
+                  <div className="form-group">
+                    <label>Description</label>
+                    <textarea
+                      placeholder="Enter sub-project description"
+                      value={newProject.description}
+                      onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                      rows="3"
+                    />
                   </div>
-
-                  {/* Stage Management */}
-                  <div className="stage-management">
-                    <h4>Stage Management:</h4>
-                    <div className="stages-row">
-                      {[1, 2, 3].map((stage) => {
-                        const stageStatus = getStageStatus(company, stage)
-                        return (
-                          <div key={stage} className={`stage-item ${stageStatus}`}>
-                            <div className="stage-number">{stage}</div>
-                            <div className="stage-status-text">
-                              {stageStatus === "approved" && "✅ Approved"}
-                              {stageStatus === "pending-approval" && "⏳ Pending"}
-                              {stageStatus === "available" && "📝 Available"}
-                              {stageStatus === "locked" && "🔒 Locked"}
-                            </div>
-                            {stageStatus === "pending-approval" && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleReviewStage(company, stage)
-                                }}
-                                className="review-stage-btn"
-                              >
-                                Review
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="company-actions" style={{ marginTop: "15px", display: "flex", gap: "10px" }}>
+                  <div className="modal-actions">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleViewSubmittedForms(company)
-                      }}
-                      className="view-forms-btn"
-                      style={{
-                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        fontSize: "0.85rem",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                      }}
+                      onClick={handleCreateProject}
+                      className="submit-btn"
+                      disabled={!newProject.name || !newProject.description}
                     >
-                      📋 View Forms
+                      Create Sub-Project
                     </button>
-                    <button
-                      onClick={() => onCompanySelect(company)}
-                      className="view-btn"
-                      style={{
-                        background: "linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        fontSize: "0.85rem",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                      }}
-                    >
-                      👁️ View Details
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const nextStage = company.stage
-                        const canSubmit = nextStage === 1 || company.stageApprovals[nextStage - 1]
-                        if (canSubmit && !company.submittedStages[nextStage]) {
-                          handleSimulateFormSubmission(company.id, nextStage)
-                        } else if (company.submittedStages[nextStage]) {
-                          alert(`Stage ${nextStage} forms already submitted!`)
-                        } else {
-                          alert(`Stage ${nextStage - 1} must be approved first!`)
-                        }
-                      }}
-                      className="submit-test-btn"
-                      style={{
-                        background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
-                        color: "white",
-                        border: "none",
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        fontSize: "0.85rem",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                      }}
-                    >
-                      📝 Submit Stage {company.stage}
+                    <button onClick={() => setShowCreateForm(false)} className="cancel-btn">
+                      Cancel
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {subProjects.length > 0 && (
+              <>
+                <h3 style={{ marginTop: "2rem", marginBottom: "1rem", fontSize: "1.5rem", fontWeight: "bold" }}>
+                  Sub-Projects
+                </h3>
+                <div className="projects-grid">
+                  {subProjects.map((project) => (
+                    <div key={project.id} className="project-card" onClick={() => onProjectSelect(project)}>
+                      <div className="project-header">
+                        <div className="project-icon" style={{ backgroundColor: selectedDepartment.color }}>
+                          📂
+                        </div>{" "}
+                        {/* Changed icon for sub-project */}
+                        <span className={`status-badge ${getStatusColor(project.status)}`}>{project.status}</span>
+                      </div>
+                      <h3>{project.name}</h3>
+                      <p>{project.description}</p>
+                      <div className="project-footer">
+                        <span>🏢 {project.companies} companies</span>
+                        <span>📅 {project.createdAt}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {directCompanies.length > 0 && (
+              <>
+                <h3 style={{ marginTop: "2rem", marginBottom: "1rem", fontSize: "1.5rem", fontWeight: "bold" }}>
+                  Companies
+                </h3>
+                <div className="companies-grid">
+                  {directCompanies.map((company) => (
+                    <div key={company.id} className="company-card">
+                      <div className="company-header">
+                        <div className="company-icon" style={{ backgroundColor: "#1E3A8A" }}>
+                          🏢
+                        </div>
+                        <span className={`status-badge ${getStatusColor(company.status)}`}>
+                          {company.status === "pending-approval" && "⏳"}
+                          {company.status === "in-progress" && "🔄"}
+                          {company.status === "completed" && "✅"}
+                          {company.status}
+                        </span>
+                      </div>
+                      <h3>{company.name}</h3>
+                      <p>
+                        Stage {company.stage} • {company.formsCompleted}/{company.totalForms} forms completed
+                      </p>
+                      <div className="progress-bar">
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${(company.formsCompleted / company.totalForms) * 100}%` }}
+                        ></div>
+                      </div>
+                      <div className="company-footer">
+                        <span>📊 {Math.round((company.formsCompleted / company.totalForms) * 100)}% complete</span>
+                        <span>📅 {company.lastActivity}</span>
+                      </div>
+
+                      {/* Stage Management */}
+                      <div className="stage-management">
+                        <h4>Stage Management:</h4>
+                        <div className="stages-row">
+                          {[1, 2, 3].map((stage) => {
+                            const stageStatus = getStageStatus(company, stage)
+                            return (
+                              <div key={stage} className={`stage-item ${stageStatus}`}>
+                                <div className="stage-number">{stage}</div>
+                                <div className="stage-status-text">
+                                  {stageStatus === "approved" && "✅ Approved"}
+                                  {stageStatus === "pending-approval" && "⏳ Pending"}
+                                  {stageStatus === "available" && "📝 Available"}
+                                  {stageStatus === "locked" && "🔒 Locked"}
+                                </div>
+                                {stageStatus === "pending-approval" && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleReviewStage(company, stage)
+                                    }}
+                                    className="review-stage-btn"
+                                  >
+                                    Review
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="company-actions" style={{ marginTop: "15px", display: "flex", gap: "10px" }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewSubmittedForms(company)
+                          }}
+                          className="view-forms-btn"
+                          style={{
+                            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                            color: "white",
+                            border: "none",
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                            fontSize: "0.85rem",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                            transition: "all 0.3s ease",
+                          }}
+                        >
+                          📋 View Forms
+                        </button>
+                        <button
+                          onClick={() => onCompanySelect(company)}
+                          className="view-btn"
+                          style={{
+                            background: "linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)",
+                            color: "white",
+                            border: "none",
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                            fontSize: "0.85rem",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                            transition: "all 0.3s ease",
+                          }}
+                        >
+                          👁️ View Details
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const nextStage = company.stage
+                            const canSubmit = nextStage === 1 || company.stageApprovals[nextStage - 1]
+                            if (canSubmit && !company.submittedStages[nextStage]) {
+                              handleSimulateFormSubmission(company.id, nextStage)
+                            } else if (company.submittedStages[nextStage]) {
+                              alert(`Stage ${nextStage} forms already submitted!`)
+                            } else {
+                              alert(`Stage ${nextStage - 1} must be approved first!`)
+                            }
+                          }}
+                          className="submit-test-btn"
+                          style={{
+                            background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+                            color: "white",
+                            border: "none",
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                            fontSize: "0.85rem",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                            transition: "all 0.3s ease",
+                          }}
+                        >
+                          📝 Submit Stage {company.stage}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
 
