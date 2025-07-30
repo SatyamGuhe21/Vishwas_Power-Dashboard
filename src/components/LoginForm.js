@@ -44,6 +44,7 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
       department = ""
     }
 
+    // Check for registered users first
     const registeredUsers = JSON.parse(localStorage.getItem("registeredUsers") || "[]")
     const user = registeredUsers.find(
       (u) =>
@@ -53,16 +54,20 @@ const LoginForm = ({ onLogin, onSwitchToRegister }) => {
     )
 
     if (user) {
+      console.log("User found in registered users:", user)
       onLogin(user)
     } else {
+      // Allow login with any credentials for demo purposes
       if (formData.email && formData.password && formData.roleAndDept) {
-        onLogin({
+        const demoUser = {
           id: Date.now(),
           email: formData.email,
           role,
           department,
           name: formData.email.split("@")[0],
-        })
+        }
+        console.log("Demo login for user:", demoUser)
+        onLogin(demoUser)
       } else {
         setError("Please fill in all required fields")
       }

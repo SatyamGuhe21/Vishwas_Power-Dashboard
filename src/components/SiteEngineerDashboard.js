@@ -1,34 +1,44 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import FormStage from "./FormStage" // Import FormStage for form submission
 
 const SiteEngineerDashboard = ({ user, selectedProject, onLogout, onProjectSelect, onCompanySelect }) => {
   const [projects, setProjects] = useState([])
   const [companies, setCompanies] = useState([])
+  const [submittedForms, setSubmittedForms] = useState([])
   const [departments, setDepartments] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState(null)
-  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedMainProject, setSelectedMainProject] = useState(null)
+  const [selectedCompany, setSelectedCompany] = useState(null)
+
+  // State for showing and managing FormStage
+  const [showFormStage, setShowFormStage] = useState(false)
+  const [formStageCompany, setFormStageCompany] = useState(null)
+  const [formStageStage, setFormStageStage] = useState(1)
 
   useEffect(() => {
+    console.log("SiteEngineerDashboard: Loading data...")
+
     // Initialize departments
     const defaultDepartments = [
       {
         id: 1,
-        name: "Auto transformer",
+        name: "Auto Transformer",
         description: "Auto transformer department for power distribution systems",
         icon: "⚡",
         color: "#C41E3A",
       },
       {
         id: 2,
-        name: "Traction transformer",
+        name: "Traction Transformer",
         description: "Traction transformer department for railway systems",
         icon: "🚊",
         color: "#1E3A8A",
       },
       {
         id: 3,
-        name: "V Connected 63 MVA transformer",
+        name: "V Connected 63 MVA Transformer",
         description: "V Connected 63 MVA transformer department for high voltage systems",
         icon: "🔌",
         color: "#047857",
@@ -36,103 +46,38 @@ const SiteEngineerDashboard = ({ user, selectedProject, onLogout, onProjectSelec
     ]
     setDepartments(defaultDepartments)
 
-    // Load projects and companies
-    const savedProjects = localStorage.getItem("etc_projects")
-    const savedCompanies = localStorage.getItem("etc_companies")
+    // Load data from localStorage - Updated to use new structure
+    const savedProjects = JSON.parse(localStorage.getItem("etc_projects") || "[]")
+    const savedCompanies = JSON.parse(localStorage.getItem("etc_companies") || "[]")
+    const savedSubmittedForms = JSON.parse(localStorage.getItem("etc_submitted_forms") || "[]")
 
-    if (savedProjects) {
-      setProjects(JSON.parse(savedProjects))
-    } else {
-      const defaultProjects = [
-        {
-          id: 1,
-          name: "Smart City Infrastructure",
-          description: "Urban development project for smart city implementation",
-          status: "active",
-          companies: 3,
-          createdAt: "2024-01-15",
-          departmentId: 1,
-        },
-        {
-          id: 2,
-          name: "Green Energy Initiative",
-          description: "Renewable energy project for sustainable development",
-          status: "active",
-          companies: 3,
-          createdAt: "2024-02-01",
-          departmentId: 2,
-        },
-        {
-          id: 3,
-          name: "High Voltage Distribution",
-          description: "High voltage power distribution project",
-          status: "active",
-          companies: 3,
-          createdAt: "2024-02-15",
-          departmentId: 3,
-        },
-      ]
-      setProjects(defaultProjects)
-      localStorage.setItem("etc_projects", JSON.stringify(defaultProjects))
-    }
+    console.log("Site Engineer loaded data:", {
+      projects: savedProjects.length,
+      companies: savedCompanies.length,
+      submittedForms: savedSubmittedForms.length,
+    })
 
-    if (savedCompanies) {
-      setCompanies(JSON.parse(savedCompanies))
-    } else {
-      const defaultCompanies = [
-        {
-          id: 1,
-          name: "TCS (Tata Consultancy Services)",
-          projectId: 1,
-          stage: 1,
-          formsCompleted: 3,
-          totalForms: 19,
-          status: "in-progress",
-          lastActivity: "2024-06-01",
-          stageApprovals: { 1: false, 2: false, 3: false, 4: false, 5: false },
-          submittedStages: { 1: false, 2: false, 3: false, 4: false, 5: false },
-        },
-        {
-          id: 2,
-          name: "IBM Corporation",
-          projectId: 1,
-          stage: 1,
-          formsCompleted: 1,
-          totalForms: 19,
-          status: "in-progress",
-          lastActivity: "2024-06-02",
-          stageApprovals: { 1: false, 2: false, 3: false, 4: false, 5: false },
-          submittedStages: { 1: false, 2: false, 3: false, 4: false, 5: false },
-        },
-        {
-          id: 3,
-          name: "HCL Technologies",
-          projectId: 1,
-          stage: 1,
-          formsCompleted: 5,
-          totalForms: 19,
-          status: "in-progress",
-          lastActivity: "2024-06-01",
-          stageApprovals: { 1: false, 2: false, 3: false, 4: false, 5: false },
-          submittedStages: { 1: false, 2: false, 3: false, 4: false, 5: false },
-        },
-      ]
-      setCompanies(defaultCompanies)
-      localStorage.setItem("etc_companies", JSON.stringify(defaultCompanies))
-    }
+    setProjects(savedProjects)
+    setCompanies(savedCompanies)
+    setSubmittedForms(savedSubmittedForms)
   }, [])
 
-  const filteredProjects = selectedDepartment
-    ? projects.filter(
-        (project) =>
-          project.departmentId === selectedDepartment.id &&
-          project.name.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    : []
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    localStorage.setItem("etc_companies", JSON.stringify(companies))
+  }, [companies])
 
-  const projectCompanies = selectedProject
-    ? companies.filter((company) => company.projectId === selectedProject.id)
-    : []
+  useEffect(() => {
+    localStorage.setItem("etc_submitted_forms", JSON.stringify(submittedForms))
+  }, [submittedForms])
+
+  const getDepartmentProjects = (departmentId) => {
+    return projects.filter((project) => project.departmentId === departmentId)
+  }
+
+  const getProjectCompanies = (projectId) => {
+    return companies.filter((company) => company.projectId === projectId)
+  }
 
   const getStatusClass = (status) => {
     switch (status) {
@@ -147,36 +92,123 @@ const SiteEngineerDashboard = ({ user, selectedProject, onLogout, onProjectSelec
     }
   }
 
+  const canSubmitForms = (company) => {
+    const currentStage = company.stage
+    // Can submit if stage 1 or previous stage is approved and current stage not submitted
+    return (currentStage === 1 || company.stageApprovals[currentStage - 1]) && !company.submittedStages[currentStage]
+  }
+
+  // Helper function to get form count for each stage
+  const getStageFormCount = (stage) => {
+    const stageForms = {
+      1: 4, // Stage 1 has 4 forms
+      2: 1, // Stage 2 has 1 form
+      3: 7, // Stage 3 has 7 forms
+      4: 6, // Stage 4 has 6 forms
+      5: 1, // Stage 5 has 1 form
+      6: 1, // Stage 6 has 1 form
+    }
+    return stageForms[stage] || 1
+  }
+
+  // Function to handle form submission from FormStage
+  const handleFormStageSubmit = (stage, submittedData) => {
+    console.log(`Site Engineer submitting forms for stage ${stage}:`, submittedData)
+
+    const newFormEntry = {
+      id: Math.max(...submittedForms.map((f) => f.id), 0) + 1,
+      companyId: formStageCompany.id,
+      stage: stage,
+      formName: `Stage ${stage} Forms`,
+      submittedAt: new Date().toISOString().split("T")[0],
+      status: "pending-review",
+      data: submittedData,
+    }
+
+    setSubmittedForms((prev) => [...prev, newFormEntry])
+
+    // Update company to show forms submitted and pending approval
+    setCompanies((prev) =>
+      prev.map((company) =>
+        company.id === formStageCompany.id
+          ? {
+              ...company,
+              status: "pending-approval",
+              submittedStages: { ...company.submittedStages, [stage]: true },
+              formsCompleted: getStageFormCount(stage),
+              lastActivity: new Date().toISOString().split("T")[0],
+            }
+          : company,
+      ),
+    )
+
+    alert(`Forms for Stage ${stage} submitted successfully! Waiting for ETC Admin approval.`)
+    setShowFormStage(false)
+    setFormStageCompany(null)
+    setFormStageStage(1)
+  }
+
+  // Function to go back from FormStage
+  const handleBackFromFormStage = () => {
+    setShowFormStage(false)
+    setFormStageCompany(null)
+    setFormStageStage(1)
+  }
+
+  const handleCompanySelect = (company) => {
+    const nextStage = company.stage
+    const canSubmit = nextStage === 1 || company.stageApprovals[nextStage - 1]
+
+    if (canSubmit && !company.submittedStages[nextStage]) {
+      setFormStageCompany(company)
+      setFormStageStage(nextStage)
+      setShowFormStage(true)
+    } else if (company.submittedStages[nextStage]) {
+      alert(`Stage ${nextStage} forms already submitted for ${company.name}!`)
+    } else {
+      alert(`Stage ${nextStage - 1} must be approved first for ${company.name}!`)
+    }
+  }
+
   return (
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-content">
           <div className="header-left">
-            {selectedProject && (
-              <button onClick={() => onProjectSelect(null)} className="back-btn">
-                ← Back
+            {showFormStage && (
+              <button onClick={handleBackFromFormStage} className="back-btn">
+                ← Back to Companies
               </button>
             )}
-            {selectedDepartment && !selectedProject && (
+            {selectedMainProject && !showFormStage && (
+              <button onClick={() => setSelectedMainProject(null)} className="back-btn">
+                ← Back to Projects
+              </button>
+            )}
+            {selectedDepartment && !selectedMainProject && !showFormStage && (
               <button onClick={() => setSelectedDepartment(null)} className="back-btn">
-                ← Back
+                ← Back to Departments
               </button>
             )}
             <div className="logo">⚡</div>
             <div className="header-title">
               <h1>
-                {selectedProject
-                  ? `${selectedProject.name} - Companies`
-                  : selectedDepartment
-                    ? `${selectedDepartment.name} - Projects`
-                    : "Site Engineer Dashboard"}
+                {showFormStage
+                  ? `Submit Forms - ${formStageCompany?.name} (Stage ${formStageStage})`
+                  : selectedMainProject
+                    ? `${selectedMainProject.name} - Companies`
+                    : selectedDepartment
+                      ? `${selectedDepartment.name} - Projects`
+                      : "Site Engineer Dashboard"}
               </h1>
               <p>
-                {selectedProject
-                  ? "Select a company to work on forms"
-                  : selectedDepartment
-                    ? "Select a project to view companies"
-                    : "Select a department to view projects"}
+                {showFormStage
+                  ? "Fill out and submit the required forms for this stage."
+                  : selectedMainProject
+                    ? "Select a company to work on forms"
+                    : selectedDepartment
+                      ? "Select a project to view companies"
+                      : "Select a department to view projects"}
               </p>
             </div>
           </div>
@@ -190,7 +222,14 @@ const SiteEngineerDashboard = ({ user, selectedProject, onLogout, onProjectSelec
       </header>
 
       <main className="dashboard-main">
-        {!selectedDepartment ? (
+        {showFormStage && formStageCompany ? (
+          <FormStage
+            stage={formStageStage}
+            onFormSubmit={handleFormStageSubmit}
+            onBack={handleBackFromFormStage}
+            companyData={formStageCompany}
+          />
+        ) : !selectedDepartment ? (
           // Department Selection
           <>
             <div className="section-header">
@@ -200,7 +239,11 @@ const SiteEngineerDashboard = ({ user, selectedProject, onLogout, onProjectSelec
 
             <div className="departments-grid">
               {departments.map((department) => {
-                const departmentProjects = projects.filter((p) => p.departmentId === department.id)
+                const departmentProjects = getDepartmentProjects(department.id)
+                const totalCompanies = departmentProjects.reduce((acc, proj) => {
+                  return acc + getProjectCompanies(proj.id).length
+                }, 0)
+
                 return (
                   <div
                     key={department.id}
@@ -217,88 +260,131 @@ const SiteEngineerDashboard = ({ user, selectedProject, onLogout, onProjectSelec
                     <p>{department.description}</p>
                     <div className="department-footer">
                       <span>📁 {departmentProjects.length} projects</span>
-                      <span>🏢 {departmentProjects.length * 3} companies</span>
+                      <span>🏢 {totalCompanies} companies</span>
                     </div>
                   </div>
                 )
               })}
             </div>
           </>
-        ) : !selectedProject ? (
+        ) : !selectedMainProject ? (
           // Projects View
           <>
             <div className="section-header">
               <div>
                 <h2>Projects in {selectedDepartment.name}</h2>
-                <p>Select a project to view companies and forms</p>
+                <p>Select a project to view companies</p>
               </div>
             </div>
 
-            <div className="search-container">
-              <input
-                type="text"
-                placeholder="🔍 Search projects..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="search-input"
-              />
-            </div>
-
             <div className="projects-grid">
-              {filteredProjects.map((project) => (
-                <div key={project.id} className="project-card" onClick={() => onProjectSelect(project)}>
-                  <div className="project-header">
-                    <div className="project-icon" style={{ backgroundColor: selectedDepartment.color }}>
-                      📁
+              {getDepartmentProjects(selectedDepartment.id).map((project) => {
+                const projectCompanies = getProjectCompanies(project.id)
+
+                return (
+                  <div key={project.id} className="project-card" onClick={() => setSelectedMainProject(project)}>
+                    <div className="project-header">
+                      <div className="project-icon" style={{ backgroundColor: selectedDepartment.color }}>
+                        📁
+                      </div>
+                      <span className={`status-badge ${getStatusClass(project.status)}`}>{project.status}</span>
                     </div>
-                    <span className={`status-badge ${getStatusClass(project.status)}`}>{project.status}</span>
+                    <h3>{project.name}</h3>
+                    <p>{project.description}</p>
+                    <div className="project-footer">
+                      <span>🏢 {projectCompanies.length} companies</span>
+                      <span>📅 {project.createdAt}</span>
+                    </div>
                   </div>
-                  <h3>{project.name}</h3>
-                  <p>{project.description}</p>
-                  <div className="project-footer">
-                    <span>🏢 {project.companies} companies</span>
-                    <span>📅 {project.createdAt}</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </>
         ) : (
-          // Companies View
+          // Companies View - Updated to work with new structure
           <>
             <div className="section-header">
-              <h2>Companies in {selectedProject.name}</h2>
+              <h2>Companies in {selectedMainProject.name}</h2>
               <p>Select a company to work on their forms</p>
             </div>
 
             <div className="companies-grid">
-              {projectCompanies.map((company) => (
-                <div key={company.id} className="company-card" onClick={() => onCompanySelect(company)}>
-                  <div className="company-header">
-                    <div className="company-icon">🏢</div>
-                    <span className={`status-badge ${getStatusClass(company.status)}`}>
-                      {company.status === "pending-approval" && "⏳"}
-                      {company.status === "in-progress" && "🔄"}
-                      {company.status === "completed" && "✅"}
-                      {company.status}
-                    </span>
-                  </div>
-                  <h3>{company.name}</h3>
+              {getProjectCompanies(selectedMainProject.id).length === 0 ? (
+                <div className="no-data-message">
+                  <h3>No Companies Available</h3>
                   <p>
-                    Stage {company.stage} • {company.formsCompleted}/{company.totalForms} forms completed
+                    No companies have been added to this project yet. Please contact the ETC Admin to add companies.
                   </p>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${(company.formsCompleted / company.totalForms) * 100}%` }}
-                    />
-                  </div>
-                  <div className="company-footer">
-                    <span>📊 {Math.round((company.formsCompleted / company.totalForms) * 100)}% complete</span>
-                    <span>📅 {company.lastActivity}</span>
-                  </div>
                 </div>
-              ))}
+              ) : (
+                getProjectCompanies(selectedMainProject.id).map((company) => (
+                  <div key={company.id} className="company-card">
+                    <div className="company-header">
+                      <div className="company-icon">🏢</div>
+                      <span className={`status-badge ${getStatusClass(company.status)}`}>
+                        {company.status === "pending-approval" && "⏳"}
+                        {company.status === "in-progress" && "🔄"}
+                        {company.status === "completed" && "✅"}
+                        {company.status}
+                      </span>
+                    </div>
+                    <h3>{company.name}</h3>
+                    <p>
+                      Stage {company.stage} • {company.formsCompleted}/{company.totalForms} forms completed
+                    </p>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${(company.formsCompleted / company.totalForms) * 100}%` }}
+                      />
+                    </div>
+                    <div className="company-footer">
+                      <span>📊 {Math.round((company.formsCompleted / company.totalForms) * 100)}% complete</span>
+                      <span>📅 {company.lastActivity}</span>
+                    </div>
+
+                    <div className="company-actions" style={{ marginTop: "15px", textAlign: "center" }}>
+                      {canSubmitForms(company) ? (
+                        <button
+                          onClick={() => handleCompanySelect(company)}
+                          className="submit-btn"
+                          style={{
+                            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                            color: "white",
+                            border: "none",
+                            padding: "10px 20px",
+                            borderRadius: "8px",
+                            fontSize: "0.9rem",
+                            fontWeight: "600",
+                            cursor: "pointer",
+                            transition: "all 0.3s ease",
+                          }}
+                        >
+                          📝 Submit Stage {company.stage} Forms
+                        </button>
+                      ) : company.submittedStages[company.stage] ? (
+                        <div className="status-info">
+                          <p style={{ color: "#f59e0b", fontWeight: "600", margin: 0 }}>
+                            ⏳ Stage {company.stage} forms submitted
+                          </p>
+                          <p style={{ color: "#6b7280", fontSize: "0.8rem", margin: "5px 0 0 0" }}>
+                            Waiting for ETC Admin approval
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="status-info">
+                          <p style={{ color: "#ef4444", fontWeight: "600", margin: 0 }}>
+                            🔒 Stage {company.stage} locked
+                          </p>
+                          <p style={{ color: "#6b7280", fontSize: "0.8rem", margin: "5px 0 0 0" }}>
+                            Previous stage must be approved first
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </>
         )}
