@@ -310,17 +310,217 @@ const useSignatureCanvas = (initialDataUrl) => {
   return { canvasRef, signatureDataUrl, clearCanvas, startDrawing, draw, stopDrawing }
 }
 
-// Photo Upload Component
-const PhotoUploadSection = ({ title, photos, onPhotoChange }) => {
+// Enhanced Photo Upload Component with Camera and Gallery Support
+const PhotoUploadSection = ({ title, photos, onPhotoChange, allowMultiple = false }) => {
+  const [cameraStream, setCameraStream] = useState(null)
+  const [showCamera, setShowCamera] = useState(false)
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }, // Use back camera on mobile
+      })
+      setCameraStream(stream)
+      setShowCamera(true)
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+    } catch (error) {
+      console.error("Error accessing camera:", error)
+      alert("Unable to access camera. Please check permissions.")
+    }
+  }
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop())
+      setCameraStream(null)
+      setShowCamera(false)
+    }
+  }
+
+  const capturePhoto = (photoKey) => {
+    if (videoRef.current && canvasRef.current) {
+      const canvas = canvasRef.current
+      const video = videoRef.current
+      const context = canvas.getContext("2d")
+
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      context.drawImage(video, 0, 0)
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const file = new File([blob], `camera-capture-${Date.now()}.jpg`, { type: "image/jpeg" })
+            onPhotoChange(photoKey, file)
+            stopCamera()
+          }
+        },
+        "image/jpeg",
+        0.8,
+      )
+    }
+  }
+
+  const handleFileSelect = (photoKey, files) => {
+    if (allowMultiple && files.length > 1) {
+      // Handle multiple files
+      Array.from(files).forEach((file, index) => {
+        onPhotoChange(`${photoKey}_${index}`, file)
+      })
+    } else {
+      // Handle single file
+      onPhotoChange(photoKey, files[0])
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      stopCamera() // Cleanup on unmount
+    }
+  }, [])
+
   return (
     <div className="photo-upload-section">
       <h4>Note: - Photographs to be added: -</h4>
       <p style={{ textAlign: "center", marginBottom: "20px", fontWeight: "600" }}>{title}</p>
+
+      {showCamera && (
+        <div
+          className="camera-modal"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.9)",
+            zIndex: 1000,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <video ref={videoRef} autoPlay playsInline style={{ maxWidth: "90%", maxHeight: "70%" }} />
+          <canvas ref={canvasRef} style={{ display: "none" }} />
+          <div style={{ marginTop: "20px" }}>
+            <button
+              onClick={() => capturePhoto(photos[0]?.key)}
+              className="capture-btn"
+              style={{
+                padding: "10px 20px",
+                margin: "0 10px",
+                backgroundColor: "#4CAF50",
+                color: "white",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+              }}
+            >
+              📷 Capture Photo
+            </button>
+            <button
+              onClick={stopCamera}
+              style={{
+                padding: "10px 20px",
+                margin: "0 10px",
+                backgroundColor: "#f44336",
+                color: "white",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+              }}
+            >
+              ❌ Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="photo-upload-grid">
         {photos.map((photo, index) => (
           <div key={index} className="photo-upload-item">
             <label>{photo.label}</label>
-            <input type="file" accept="image/*" onChange={(e) => onPhotoChange(photo.key, e.target.files[0])} />
+
+            <div className="upload-options" style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+              {/* Camera Button */}
+              <button
+                type="button"
+                onClick={startCamera}
+                className="camera-btn"
+                style={{
+                  padding: "8px 12px",
+                  backgroundColor: "#2196F3",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                }}
+              >
+                📷 Camera
+              </button>
+
+              {/* Gallery Upload */}
+              <label
+                className="gallery-btn"
+                style={{
+                  padding: "8px 12px",
+                  backgroundColor: "#FF9800",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                }}
+              >
+                🖼️ Gallery
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple={allowMultiple}
+                  onChange={(e) => handleFileSelect(photo.key, e.target.files)}
+                  style={{ display: "none" }}
+                />
+              </label>
+
+              {/* Bulk Upload (if allowed) */}
+              {allowMultiple && (
+                <label
+                  className="bulk-btn"
+                  style={{
+                    padding: "8px 12px",
+                    backgroundColor: "#9C27B0",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                  }}
+                >
+                  📁 Bulk
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handleFileSelect(photo.key, e.target.files)}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Traditional file input as fallback */}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => onPhotoChange(photo.key, e.target.files[0])}
+              style={{ marginTop: "10px", width: "100%" }}
+            />
           </div>
         ))}
       </div>
@@ -328,6 +528,78 @@ const PhotoUploadSection = ({ title, photos, onPhotoChange }) => {
   )
 }
 
+// PDF Generation Utility
+const generatePDF = async (formData, stage) => {
+  try {
+    // Create a new window for printing
+    const printWindow = window.open("", "_blank")
+
+    // Generate HTML content for all forms
+    let htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Transformer Testing Report - Stage ${stage}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .form-section { margin-bottom: 40px; page-break-inside: avoid; }
+          .form-title { background: #f0f0f0; padding: 10px; font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .signature-section { margin-top: 30px; }
+          .signature-box { display: inline-block; margin: 20px; }
+          @media print {
+            .no-print { display: none; }
+            .page-break { page-break-before: always; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>VISHVAS POWER</h1>
+          <h2>Transformer Testing and Commissioning Report</h2>
+          <h3>Stage ${stage} - Complete Documentation</h3>
+          <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        </div>
+    `
+
+    // Add form data to HTML
+    Object.entries(formData).forEach(([formId, data]) => {
+      htmlContent += `
+        <div class="form-section">
+          <div class="form-title">${formId.replace(/-/g, " ").toUpperCase()}</div>
+          <div class="form-content">
+            ${JSON.stringify(data, null, 2).replace(/\n/g, "<br>").replace(/ /g, "&nbsp;")}
+          </div>
+        </div>
+      `
+    })
+
+    htmlContent += `
+        <div class="no-print" style="text-align: center; margin-top: 30px;">
+          <button onclick="window.print()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            🖨️ Print / Save as PDF
+          </button>
+          <button onclick="window.close()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+            ❌ Close
+          </button>
+        </div>
+      </body>
+      </html>
+    `
+
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+
+    // Auto-focus the print window
+    printWindow.focus()
+  } catch (error) {
+    console.error("Error generating PDF:", error)
+    alert("Error generating PDF. Please try again.")
+  }
+}
 // Digital Signature Component
 const DigitalSignatureSection = ({ signatures, onSignatureChange }) => {
   return (
@@ -5680,7 +5952,7 @@ function WorkCompletionReportForm({ onSubmit, onPrevious, initialData, isLastFor
                 style={{ border: "none", borderBottom: "1px solid #333", background: "transparent", width: "120px" }}
               />
             </div>
-
+        
             <div style={{ marginBottom: "15px" }}>
               <strong>Signature: </strong>
               <SignatureBox
@@ -5691,6 +5963,7 @@ function WorkCompletionReportForm({ onSubmit, onPrevious, initialData, isLastFor
                 initialSignature={formData.signatures.customerSignature}
               />
             </div>
+
 
             <div style={{ marginBottom: "15px" }}>
               <strong>Date: </strong>
