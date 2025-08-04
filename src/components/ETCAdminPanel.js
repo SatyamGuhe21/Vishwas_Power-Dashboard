@@ -4,29 +4,48 @@ import { useState, useEffect } from "react"
 import FormStage from "./FormStage" // Import FormStage
 import "./stage-review-styles.css"
 
-const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCompanySelect, onBackToMain }) => {
+const ETCAdminPanel = ({ user, selectedCompany, onLogout, onCompanySelect, onProjectSelect, onBackToMain }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [departments, setDepartments] = useState([])
-  const [projects, setProjects] = useState([])
+  const [Companys, setCompanys] = useState([])
   const [companies, setCompanies] = useState([])
   const [submittedForms, setSubmittedForms] = useState([])
 
   const [selectedDepartment, setSelectedDepartment] = useState(null)
-  const [selectedMainProject, setSelectedMainProject] = useState(null)
+  const [selectedMainCompany, setSelectedMainCompany] = useState(null)
 
-  const [newProject, setNewProject] = useState({ name: "", description: "" })
-  const [showCreateProjectForm, setShowCreateProjectForm] = useState(false)
+  const [newCompany, setNewCompany] = useState({ name: "", description: "" })
+  const [showCreateCompanyForm, setShowCreateCompanyForm] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState("")
   const [reviewMode, setReviewMode] = useState(false)
-  const [selectedCompanyForReview, setSelectedCompanyForReview] = useState(null)
+  const [selectedProjectForReview, setSelectedProjectForReview] = useState(null)
   const [currentStageReview, setCurrentStageReview] = useState(1)
   const [showSubmitterReview, setShowSubmitterReview] = useState(false)
 
   // State for showing and managing FormStage
   const [showFormStage, setShowFormStage] = useState(false)
-  const [formStageCompany, setFormStageCompany] = useState(null)
+  const [formStageProject, setFormStageProject] = useState(null)
   const [formStageStage, setFormStageStage] = useState(1)
+
+  // Modal states for replacing alerts and prompts
+  const [showNotificationModal, setShowNotificationModal] = useState(false)
+  const [notificationMessage, setNotificationMessage] = useState("")
+  const [notificationType, setNotificationType] = useState("info") // info, success, error, warning
+
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmMessage, setConfirmMessage] = useState("")
+  const [confirmAction, setConfirmAction] = useState(null)
+
+  const [showInputModal, setShowInputModal] = useState(false)
+  const [inputModalTitle, setInputModalTitle] = useState("")
+  const [inputModalPlaceholder, setInputModalPlaceholder] = useState("")
+  const [inputModalValue, setInputModalValue] = useState("")
+  const [inputModalAction, setInputModalAction] = useState(null)
+
+  const [showRejectionModal, setShowRejectionModal] = useState(false)
+  const [rejectionStage, setRejectionStage] = useState(null)
+  const [rejectionReason, setRejectionReason] = useState("")
 
   // Default data for initialization
   const defaultDepartments = [
@@ -53,11 +72,11 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
     },
   ]
 
-  const defaultProjects = [
+  const defaultCompanys = [
     {
       id: 101,
       name: "Smart City Infrastructure",
-      description: "Urban development project for smart city implementation",
+      description: "Urban development Company for smart city implementation",
       status: "active",
       createdAt: "2024-01-15",
       departmentId: 1,
@@ -65,7 +84,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
     {
       id: 102,
       name: "Railway Electrification",
-      description: "Project for electrifying railway lines",
+      description: "Company for electrifying railway lines",
       status: "active",
       createdAt: "2024-02-01",
       departmentId: 2,
@@ -83,19 +102,40 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
   const defaultCompanies = []
   const mockSubmittedForms = []
 
+  // Helper functions for modals
+  const showNotification = (message, type = "info") => {
+    setNotificationMessage(message)
+    setNotificationType(type)
+    setShowNotificationModal(true)
+  }
+
+  const showConfirmDialog = (message, action) => {
+    setConfirmMessage(message)
+    setConfirmAction(() => action)
+    setShowConfirmModal(true)
+  }
+
+  const showInputDialog = (title, placeholder, action) => {
+    setInputModalTitle(title)
+    setInputModalPlaceholder(placeholder)
+    setInputModalValue("")
+    setInputModalAction(() => action)
+    setShowInputModal(true)
+  }
+
   // Load data from localStorage on component mount
   useEffect(() => {
     setDepartments(defaultDepartments)
 
-    const savedProjects = localStorage.getItem("etc_projects")
+    const savedCompanys = localStorage.getItem("etc_Companys")
     const savedCompanies = localStorage.getItem("etc_companies")
     const savedSubmittedForms = localStorage.getItem("etc_submitted_forms")
 
-    if (savedProjects) {
-      setProjects(JSON.parse(savedProjects))
+    if (savedCompanys) {
+      setCompanys(JSON.parse(savedCompanys))
     } else {
-      setProjects(defaultProjects)
-      localStorage.setItem("etc_projects", JSON.stringify(defaultProjects))
+      setCompanys(defaultCompanys)
+      localStorage.setItem("etc_Companys", JSON.stringify(defaultCompanys))
     }
 
     if (savedCompanies) {
@@ -115,8 +155,8 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
 
   // Save to localStorage whenever data changes
   useEffect(() => {
-    localStorage.setItem("etc_projects", JSON.stringify(projects))
-  }, [projects])
+    localStorage.setItem("etc_Companys", JSON.stringify(Companys))
+  }, [Companys])
 
   useEffect(() => {
     localStorage.setItem("etc_companies", JSON.stringify(companies))
@@ -126,44 +166,45 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
     localStorage.setItem("etc_submitted_forms", JSON.stringify(submittedForms))
   }, [submittedForms])
 
-  const handleCreateProject = () => {
-    if (newProject.name && newProject.description && selectedDepartment) {
-      const projectId = Math.max(...projects.map((p) => p.id), 0) + 1
+  const handleCreateCompany = () => {
+    if (newCompany.name && newCompany.description && selectedDepartment) {
+      const CompanyId = Math.max(...Companys.map((p) => p.id), 0) + 1
 
-      const project = {
-        id: projectId,
-        name: newProject.name,
-        description: newProject.description,
+      const Company = {
+        id: CompanyId,
+        name: newCompany.name,
+        description: newCompany.description,
         status: "active",
         createdAt: new Date().toISOString().split("T")[0],
         departmentId: selectedDepartment.id,
       }
 
-      setProjects([...projects, project])
-      setNewProject({ name: "", description: "" })
-      setShowCreateProjectForm(false)
-      alert(`Project "${project.name}" created successfully in ${selectedDepartment.name}!`)
+      setCompanys([...Companys, Company])
+      setNewCompany({ name: "", description: "" })
+      setShowCreateCompanyForm(false)
+      showNotification(`Company "${Company.name}" created successfully in ${selectedDepartment.name}!`, "success")
     }
   }
 
-  const handleAddCompany = (projectId) => {
-    const companyName = prompt("Enter company name:")
-    if (companyName) {
-      const newCompany = {
-        id: Math.max(...companies.map((c) => c.id), 0) + 1,
-        name: companyName,
-        projectId: projectId,
-        stage: 1,
-        formsCompleted: 0,
-        totalForms: getStageFormCount(1),
-        status: "in-progress",
-        lastActivity: new Date().toISOString().split("T")[0],
-        stageApprovals: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false },
-        submittedStages: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false },
+  const handleAddProject = (CompanyId) => {
+    showInputDialog("Create New Project", "Enter Project name...", (ProjectName) => {
+      if (ProjectName.trim()) {
+        const newProject = {
+          id: Math.max(...companies.map((c) => c.id), 0) + 1,
+          name: ProjectName,
+          CompanyId: CompanyId,
+          stage: 1,
+          formsCompleted: 0,
+          totalForms: getStageFormCount(1),
+          status: "in-progress",
+          lastActivity: new Date().toISOString().split("T")[0],
+          stageApprovals: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false },
+          submittedStages: { 1: false, 2: false, 3: false, 4: false, 5: false, 6: false },
+        }
+        setCompanies((prev) => [...prev, newProject])
+        showNotification(`Project "${ProjectName}" added to this Company!`, "success")
       }
-      setCompanies((prev) => [...prev, newCompany])
-      alert(`Company "${companyName}" added to this project!`)
-    }
+    })
   }
 
   // Helper function to get form count for each stage
@@ -179,77 +220,86 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
     return stageForms[stage] || 1
   }
 
-  const handleReviewStage = (company, stage) => {
-    const stageForms = submittedForms.filter((form) => form.companyId === company.id && form.stage === stage)
+  const handleReviewStage = (Project, stage) => {
+    const stageForms = submittedForms.filter((form) => form.ProjectId === Project.id && form.stage === stage)
 
     if (stageForms.length === 0) {
-      alert(`No forms submitted for Stage ${stage} yet.`)
+      showNotification(`No forms submitted for Stage ${stage} yet.`, "warning")
       return
     }
 
-    setSelectedCompanyForReview(company)
+    setSelectedProjectForReview(Project)
     setCurrentStageReview(stage)
     setReviewMode(true)
   }
 
   const handleApproveStage = (stage) => {
-    if (!selectedCompanyForReview) {
-      alert("No company selected for review.")
+    if (!selectedProjectForReview) {
+      showNotification("No Project selected for review.", "error")
       return
     }
 
-    console.log(`Approving stage ${stage} for company ${selectedCompanyForReview.name}`)
+    console.log(`Approving stage ${stage} for Project ${selectedProjectForReview.name}`)
 
     // Update submitted forms status
     setSubmittedForms((forms) =>
       forms.map((form) =>
-        form.companyId === selectedCompanyForReview.id && form.stage === stage
+        form.ProjectId === selectedProjectForReview.id && form.stage === stage
           ? { ...form, status: "approved", reviewedAt: new Date().toISOString().split("T")[0] }
           : form,
       ),
     )
 
-    // Update company status and unlock next stage
+    // Update Project status and unlock next stage
     setCompanies((companies) =>
-      companies.map((company) =>
-        company.id === selectedCompanyForReview.id
+      companies.map((Project) =>
+        Project.id === selectedProjectForReview.id
           ? {
-              ...company,
-              stageApprovals: { ...company.stageApprovals, [stage]: true },
-              submittedStages: { ...company.submittedStages, [stage]: true },
+              ...Project,
+              stageApprovals: { ...Project.stageApprovals, [stage]: true },
+              submittedStages: { ...Project.submittedStages, [stage]: true },
               status: stage === 6 ? "completed" : "in-progress",
               stage: stage === 6 ? 6 : stage + 1, // Move to next stage
               formsCompleted: 0, // Reset forms for next stage
               totalForms: stage === 6 ? getStageFormCount(6) : getStageFormCount(stage + 1), // Update total forms for next stage
               lastActivity: new Date().toISOString().split("T")[0],
             }
-          : company,
+          : Project,
       ),
     )
 
-    alert(
-      `Stage ${stage} approved for ${selectedCompanyForReview.name}! ${stage === 6 ? "Company completed all stages." : `Stage ${stage + 1} is now available.`}`,
+    showNotification(
+      `Stage ${stage} approved for ${selectedProjectForReview.name}! ${stage === 6 ? "Project completed all stages." : `Stage ${stage + 1} is now available.`}`,
+      "success",
     )
     setReviewMode(false)
-    setSelectedCompanyForReview(null)
+    setSelectedProjectForReview(null)
     setCurrentStageReview(1)
   }
 
   const handleRejectStage = (stage) => {
-    if (!selectedCompanyForReview) {
-      alert("No company selected for review.")
+    if (!selectedProjectForReview) {
+      showNotification("No Project selected for review.", "error")
       return
     }
 
-    const rejectionReason = prompt("Please provide a reason for rejecting this stage:")
-    if (!rejectionReason) return
+    setRejectionStage(stage)
+    setRejectionReason("")
+    setShowRejectionModal(true)
+  }
 
-    console.log(`Rejecting stage ${stage} for company ${selectedCompanyForReview.name}`)
+  const confirmRejectStage = () => {
+    if (!rejectionReason.trim()) {
+      showNotification("Please provide a reason for rejecting this stage.", "warning")
+      return
+    }
+
+    console.log(`Rejecting stage ${rejectionStage} for Project ${selectedProjectForReview.name}`)
 
     // Update submitted forms status
     setSubmittedForms((forms) =>
       forms.map((form) =>
-        form.companyId === selectedCompanyForReview.id && form.stage === stage
+        form.ProjectId === selectedProjectForReview.id && form.stage === rejectionStage
           ? {
               ...form,
               status: "rejected",
@@ -260,44 +310,50 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
       ),
     )
 
-    // Reset company stage submission status
+    // Reset Project stage submission status
     setCompanies((companies) =>
-      companies.map((company) =>
-        company.id === selectedCompanyForReview.id
+      companies.map((Project) =>
+        Project.id === selectedProjectForReview.id
           ? {
-              ...company,
+              ...Project,
               status: "in-progress",
-              submittedStages: { ...company.submittedStages, [stage]: false },
-              stageApprovals: { ...company.stageApprovals, [stage]: false },
+              submittedStages: { ...Project.submittedStages, [rejectionStage]: false },
+              stageApprovals: { ...Project.stageApprovals, [rejectionStage]: false },
               formsCompleted: 0, // Reset forms completed for this stage
-              totalForms: getStageFormCount(stage), // Reset total forms for current stage
+              totalForms: getStageFormCount(rejectionStage), // Reset total forms for current stage
               lastActivity: new Date().toISOString().split("T")[0],
             }
-          : company,
+          : Project,
       ),
     )
 
-    alert(`Stage ${stage} rejected for ${selectedCompanyForReview.name}. Company needs to resubmit forms.`)
+    showNotification(
+      `Stage ${rejectionStage} rejected for ${selectedProjectForReview.name}. Project needs to resubmit forms.`,
+      "warning",
+    )
+    setShowRejectionModal(false)
+    setRejectionStage(null)
+    setRejectionReason("")
     setReviewMode(false)
-    setSelectedCompanyForReview(null)
+    setSelectedProjectForReview(null)
     setCurrentStageReview(1)
   }
 
-  const handleViewSubmittedForms = (company) => {
-    const companyForms = submittedForms.filter((form) => form.companyId === company.id)
-    if (companyForms.length === 0) {
-      alert("No forms submitted yet.")
+  const handleViewSubmittedForms = (Project) => {
+    const ProjectForms = submittedForms.filter((form) => form.ProjectId === Project.id)
+    if (ProjectForms.length === 0) {
+      showNotification("No forms submitted yet.", "info")
       return
     }
 
-    setSelectedCompanyForReview(company)
+    setSelectedProjectForReview(Project)
     setShowSubmitterReview(true)
   }
 
   const handleBackFromReview = () => {
     setReviewMode(false)
     setShowSubmitterReview(false)
-    setSelectedCompanyForReview(null)
+    setSelectedProjectForReview(null)
     setCurrentStageReview(1)
   }
 
@@ -314,48 +370,48 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
     }
   }
 
-  const getStageStatus = (company, stage) => {
-    if (company.stageApprovals[stage]) return "approved"
-    if (company.submittedStages[stage]) return "pending-approval"
-    if (stage === 1 || company.stageApprovals[stage - 1]) return "available"
+  const getStageStatus = (Project, stage) => {
+    if (Project.stageApprovals[stage]) return "approved"
+    if (Project.submittedStages[stage]) return "pending-approval"
+    if (stage === 1 || Project.stageApprovals[stage - 1]) return "available"
     return "locked"
   }
 
-  const getDepartmentProjects = (departmentId) => {
-    return projects.filter((project) => project.departmentId === departmentId)
+  const getDepartmentCompanys = (departmentId) => {
+    return Companys.filter((Company) => Company.departmentId === departmentId)
   }
 
-  const getProjectCompanies = (projectId) => {
-    return companies.filter((company) => company.projectId === projectId)
+  const getCompanyCompanies = (CompanyId) => {
+    return companies.filter((Project) => Project.CompanyId === CompanyId)
   }
 
-  const filteredProjects = selectedDepartment
-    ? getDepartmentProjects(selectedDepartment.id).filter((project) =>
-        project.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredCompanys = selectedDepartment
+    ? getDepartmentCompanys(selectedDepartment.id).filter((Company) =>
+        Company.name.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     : []
 
   const currentStageForms = reviewMode
     ? submittedForms.filter(
-        (form) => form.companyId === selectedCompanyForReview.id && form.stage === currentStageReview,
+        (form) => form.ProjectId === selectedProjectForReview.id && form.stage === currentStageReview,
       )
     : []
 
-  const allCompanyForms = showSubmitterReview
-    ? submittedForms.filter((form) => form.companyId === selectedCompanyForReview.id)
+  const allProjectForms = showSubmitterReview
+    ? submittedForms.filter((form) => form.ProjectId === selectedProjectForReview.id)
     : []
 
   const handleLogoutAndClearData = () => {
-    localStorage.removeItem("etc_projects")
+    localStorage.removeItem("etc_Companys")
     localStorage.removeItem("etc_companies")
     localStorage.removeItem("etc_submitted_forms")
 
-    setProjects([])
+    setCompanys([])
     setCompanies([])
     setSubmittedForms([])
     setSelectedDepartment(null)
-    setSelectedMainProject(null)
-    setSelectedCompanyForReview(null)
+    setSelectedMainCompany(null)
+    setSelectedProjectForReview(null)
     setReviewMode(false)
     setShowSubmitterReview(false)
     setShowFormStage(false)
@@ -369,7 +425,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
 
     const newFormEntry = {
       id: Math.max(...submittedForms.map((f) => f.id), 0) + 1,
-      companyId: formStageCompany.id,
+      ProjectId: formStageProject.id,
       stage: stage,
       formName: `Stage ${stage} Forms`,
       submittedAt: new Date().toISOString().split("T")[0],
@@ -379,32 +435,47 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
 
     setSubmittedForms((prev) => [...prev, newFormEntry])
 
-    // Update company to show forms submitted and pending approval
+    // Update Project to show forms submitted and pending approval
     setCompanies((prev) =>
-      prev.map((company) =>
-        company.id === formStageCompany.id
+      prev.map((Project) =>
+        Project.id === formStageProject.id
           ? {
-              ...company,
+              ...Project,
               status: "pending-approval",
-              submittedStages: { ...company.submittedStages, [stage]: true },
+              submittedStages: { ...Project.submittedStages, [stage]: true },
               formsCompleted: getStageFormCount(stage),
               lastActivity: new Date().toISOString().split("T")[0],
             }
-          : company,
+          : Project,
       ),
     )
 
-    alert(`Forms for Stage ${stage} submitted successfully! Waiting for ETC Admin approval.`)
+    showNotification(`Forms for Stage ${stage} submitted successfully! Waiting for ETC Admin approval.`, "success")
     setShowFormStage(false)
-    setFormStageCompany(null)
+    setFormStageProject(null)
     setFormStageStage(1)
   }
 
   // Function to go back from FormStage
   const handleBackFromFormStage = () => {
     setShowFormStage(false)
-    setFormStageCompany(null)
+    setFormStageProject(null)
     setFormStageStage(1)
+  }
+
+  const handleStageSubmit = (Project) => {
+    const nextStage = Project.stage
+    const canSubmit = nextStage === 1 || Project.stageApprovals[nextStage - 1]
+
+    if (canSubmit && !Project.submittedStages[nextStage]) {
+      setFormStageProject(Project)
+      setFormStageStage(nextStage)
+      setShowFormStage(true)
+    } else if (Project.submittedStages[nextStage]) {
+      showNotification(`Stage ${nextStage} forms already submitted!`, "warning")
+    } else {
+      showNotification(`Stage ${nextStage - 1} must be approved first!`, "warning")
+    }
   }
 
   return (
@@ -427,15 +498,15 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
             <div className="header-title">
               <h1>
                 {showFormStage
-                  ? `Submit Forms - ${formStageCompany?.name} (Stage ${formStageStage})`
+                  ? `Submit Forms - ${formStageProject?.name} (Stage ${formStageStage})`
                   : reviewMode
-                    ? `Review Stage ${currentStageReview} - ${selectedCompanyForReview?.name}`
+                    ? `Review Stage ${currentStageReview} - ${selectedProjectForReview?.name}`
                     : showSubmitterReview
-                      ? `Submitted Forms - ${selectedCompanyForReview?.name}`
-                      : selectedMainProject
-                        ? `${selectedMainProject.name} - Companies`
+                      ? `Submitted Forms - ${selectedProjectForReview?.name}`
+                      : selectedMainCompany
+                        ? `${selectedMainCompany.name} - Companies`
                         : selectedDepartment
-                          ? `${selectedDepartment.name} - Projects`
+                          ? `${selectedDepartment.name} - Companys`
                           : "ETC Admin Panel"}
               </h1>
               <p>
@@ -444,12 +515,12 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                   : reviewMode
                     ? "Review and approve/reject stage forms"
                     : showSubmitterReview
-                      ? "View all submitted forms by company"
-                      : selectedMainProject
+                      ? "View all submitted forms by Project"
+                      : selectedMainCompany
                         ? "Manage companies and their workflows"
                         : selectedDepartment
-                          ? "Manage projects in department"
-                          : "Manage departments, projects and companies"}
+                          ? "Manage Companys in department"
+                          : "Manage departments, Companys and companies"}
               </p>
             </div>
           </div>
@@ -485,12 +556,12 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
       </header>
 
       <main className="etc-main">
-        {showFormStage && formStageCompany ? (
+        {showFormStage && formStageProject ? (
           <FormStage
             stage={formStageStage}
             onFormSubmit={handleFormStageSubmit}
             onBack={handleBackFromFormStage}
-            companyData={formStageCompany}
+            ProjectData={formStageProject}
           />
         ) : reviewMode ? (
           <>
@@ -508,13 +579,13 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
               <div className="stage-info-card">
                 <h3>Stage {currentStageReview} Information</h3>
                 <p>
-                  <strong>Company:</strong> {selectedCompanyForReview?.name}
+                  <strong>Project:</strong> {selectedProjectForReview?.name}
                 </p>
                 <p>
                   <strong>Total Forms:</strong> {currentStageForms.length}
                 </p>
                 <p>
-                  <strong>Status:</strong> {getStageStatus(selectedCompanyForReview, currentStageReview)}
+                  <strong>Status:</strong> {getStageStatus(selectedProjectForReview, currentStageReview)}
                 </p>
               </div>
             </div>
@@ -603,7 +674,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
             <div className="section-header">
               <div>
                 <h2>All Submitted Forms</h2>
-                <p>Review all forms submitted by {selectedCompanyForReview?.name}</p>
+                <p>Review all forms submitted by {selectedProjectForReview?.name}</p>
               </div>
               <button onClick={handleBackFromReview} className="back-btn">
                 ← Back to Companies
@@ -614,28 +685,28 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
               <div className="review-stats">
                 <div className="stat-card">
                   <h4>Total Forms</h4>
-                  <div className="stat-number">{allCompanyForms.length}</div>
+                  <div className="stat-number">{allProjectForms.length}</div>
                 </div>
                 <div className="stat-card">
                   <h4>Approved</h4>
-                  <div className="stat-number">{allCompanyForms.filter((f) => f.status === "approved").length}</div>
+                  <div className="stat-number">{allProjectForms.filter((f) => f.status === "approved").length}</div>
                 </div>
                 <div className="stat-card">
                   <h4>Pending</h4>
                   <div className="stat-number">
-                    {allCompanyForms.filter((f) => f.status === "pending-review").length}
+                    {allProjectForms.filter((f) => f.status === "pending-review").length}
                   </div>
                 </div>
                 <div className="stat-card">
                   <h4>Rejected</h4>
-                  <div className="stat-number">{allCompanyForms.filter((f) => f.status === "rejected").length}</div>
+                  <div className="stat-number">{allProjectForms.filter((f) => f.status === "rejected").length}</div>
                 </div>
               </div>
             </div>
 
             <div className="stages-review-container">
               {[1, 2, 3, 4, 5, 6].map((stage) => {
-                const stageForms = allCompanyForms.filter((form) => form.stage === stage)
+                const stageForms = allProjectForms.filter((form) => form.stage === stage)
                 if (stageForms.length === 0) return null
 
                 return (
@@ -712,13 +783,13 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
             <div className="section-header">
               <div>
                 <h2>Transformer Categories</h2>
-                <p>Select a category to manage projects and companies</p>
+                <p>Select a category to manage Companys and companies</p>
               </div>
             </div>
 
             <div className="departments-grid">
               {departments.map((department) => {
-                const departmentProjects = getDepartmentProjects(department.id)
+                const departmentCompanys = getDepartmentCompanys(department.id)
                 return (
                   <div
                     key={department.id}
@@ -734,11 +805,11 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                     <h3>{department.name}</h3>
                     <p>{department.description}</p>
                     <div className="department-footer">
-                      <span>📁 {departmentProjects.length} projects</span>
+                      <span>📁 {departmentCompanys.length} Companys</span>
                       <span>
                         🏢{" "}
-                        {departmentProjects.reduce((acc, proj) => {
-                          return acc + getProjectCompanies(proj.id).length
+                        {departmentCompanys.reduce((acc, proj) => {
+                          return acc + getCompanyCompanies(proj.id).length
                         }, 0)}{" "}
                         companies
                       </span>
@@ -748,15 +819,15 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
               })}
             </div>
           </>
-        ) : !selectedMainProject ? (
+        ) : !selectedMainCompany ? (
           <>
             <div className="section-header">
               <div>
-                <h2>Projects in {selectedDepartment.name}</h2>
-                <p>Create and manage projects for this category</p>
+                <h2>Companys in {selectedDepartment.name}</h2>
+                <p>Create and manage Companys for this category</p>
               </div>
               <div className="section-actions">
-                <button onClick={() => setShowCreateProjectForm(true)} className="create-btn">
+                <button onClick={() => setShowCreateCompanyForm(true)} className="create-btn">
                   ➕ Create Company
                 </button>
                 <button onClick={() => setSelectedDepartment(null)} className="back-btn">
@@ -768,49 +839,49 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
             <div className="search-bar">
               <input
                 type="text"
-                placeholder="🔍 Search projects..."
+                placeholder="🔍 Search Companys..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
 
-            {showCreateProjectForm && (
-              <div className="modal-overlay" onClick={() => setShowCreateProjectForm(false)}>
+            {showCreateCompanyForm && (
+              <div className="modal-overlay" onClick={() => setShowCreateCompanyForm(false)}>
                 <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                   <div className="modal-header">
                     <img src="/logo.png" alt="Vishvas Power" className="logo-small" />
-                    <h3>Create New Project in {selectedDepartment.name}</h3>
+                    <h3>Create New Company in {selectedDepartment.name}</h3>
                   </div>
-                  <p>Companies will be added to this project after creation</p>
+                  <p>Companies will be added to this Company after creation</p>
                   <div className="form-group">
-                    <label>Project Name</label>
+                    <label>Company Name</label>
                     <input
                       type="text"
-                      placeholder="Enter project name"
-                      value={newProject.name}
-                      onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                      placeholder="Enter Company name"
+                      value={newCompany.name}
+                      onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
                       required
                     />
                   </div>
                   <div className="form-group">
                     <label>Description</label>
                     <textarea
-                      placeholder="Enter project description"
-                      value={newProject.description}
-                      onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                      placeholder="Enter Company description"
+                      value={newCompany.description}
+                      onChange={(e) => setNewCompany({ ...newCompany, description: e.target.value })}
                       rows="3"
                       required
                     />
                   </div>
                   <div className="modal-actions">
                     <button
-                      onClick={handleCreateProject}
+                      onClick={handleCreateCompany}
                       className="submit-btn"
-                      disabled={!newProject.name || !newProject.description}
+                      disabled={!newCompany.name || !newCompany.description}
                     >
-                      Create Company
+                      Create Project
                     </button>
-                    <button onClick={() => setShowCreateProjectForm(false)} className="cancel-btn">
+                    <button onClick={() => setShowCreateCompanyForm(false)} className="cancel-btn">
                       Cancel
                     </button>
                   </div>
@@ -818,32 +889,32 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
               </div>
             )}
 
-            <div className="projects-grid">
-              {filteredProjects.map((project) => {
-                const projectCompanies = getProjectCompanies(project.id)
+            <div className="Companys-grid">
+              {filteredCompanys.map((Company) => {
+                const CompanyCompanies = getCompanyCompanies(Company.id)
 
                 return (
-                  <div key={project.id} className="project-card">
-                    <div className="project-header">
-                      <div className="project-icon" style={{ backgroundColor: selectedDepartment.color }}>
+                  <div key={Company.id} className="Company-card">
+                    <div className="Company-header">
+                      <div className="Company-icon" style={{ backgroundColor: selectedDepartment.color }}>
                         📁
                       </div>
-                      <span className={`status-badge ${getStatusColor(project.status)}`}>{project.status}</span>
+                      <span className={`status-badge ${getStatusColor(Company.status)}`}>{Company.status}</span>
                     </div>
-                    <h3>{project.name}</h3>
-                    <p>{project.description}</p>
-                    <div className="project-footer">
-                      <span>🏢 {projectCompanies.length} companies</span>
-                      <span>📅 {project.createdAt}</span>
+                    <h3>{Company.name}</h3>
+                    <p>{Company.description}</p>
+                    <div className="Company-footer">
+                      <span>🏢 {CompanyCompanies.length} companies</span>
+                      <span>📅 {Company.createdAt}</span>
                     </div>
                     <div
-                      className="project-actions"
+                      className="Company-actions"
                       style={{ marginTop: "15px", display: "flex", gap: "10px", justifyContent: "flex-end" }}
                     >
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectedMainProject(project)
+                          setSelectedMainCompany(Company)
                         }}
                         className="view-btn"
                         style={{
@@ -870,58 +941,58 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
           <>
             <div className="section-header">
               <div>
-                <h2>Companies in {selectedMainProject.name}</h2>
+                <h2>Companies in {selectedMainCompany.name}</h2>
                 <p>Manage companies and their workflows</p>
               </div>
               <div className="section-actions">
-                <button onClick={() => handleAddCompany(selectedMainProject.id)} className="create-btn">
+                <button onClick={() => handleAddProject(selectedMainCompany.id)} className="create-btn">
                   ➕ Create Project
                 </button>
-                <button onClick={() => setSelectedMainProject(null)} className="back-btn">
-                  ← Back to Projects
+                <button onClick={() => setSelectedMainCompany(null)} className="back-btn">
+                  ← Back to Companys
                 </button>
               </div>
             </div>
 
             <div className="companies-grid">
-              {getProjectCompanies(selectedMainProject.id).length === 0 ? (
+              {getCompanyCompanies(selectedMainCompany.id).length === 0 ? (
                 <p className="no-data-message">
-                  No companies found for this project. Click "Create Project" to create one.
+                  No companies found for this Company. Click "Create Company" to create one.
                 </p>
               ) : (
-                getProjectCompanies(selectedMainProject.id).map((company) => (
-                  <div key={company.id} className="company-card">
-                    <div className="company-header">
-                      <div className="company-icon" style={{ backgroundColor: "#1E3A8A" }}>
+                getCompanyCompanies(selectedMainCompany.id).map((Project) => (
+                  <div key={Project.id} className="Project-card">
+                    <div className="Project-header">
+                      <div className="Project-icon" style={{ backgroundColor: "#1E3A8A" }}>
                         🏢
                       </div>
-                      <span className={`status-badge ${getStatusColor(company.status)}`}>
-                        {company.status === "pending-approval" && "⏳"}
-                        {company.status === "in-progress" && "🔄"}
-                        {company.status === "completed" && "✅"}
-                        {company.status}
+                      <span className={`status-badge ${getStatusColor(Project.status)}`}>
+                        {Project.status === "pending-approval" && "⏳"}
+                        {Project.status === "in-progress" && "🔄"}
+                        {Project.status === "completed" && "✅"}
+                        {Project.status}
                       </span>
                     </div>
-                    <h3>{company.name}</h3>
+                    <h3>{Project.name}</h3>
                     <p>
-                      Stage {company.stage} • {company.formsCompleted}/{company.totalForms} forms completed
+                      Stage {Project.stage} • {Project.formsCompleted}/{Project.totalForms} forms completed
                     </p>
                     <div className="progress-bar">
                       <div
                         className="progress-fill"
-                        style={{ width: `${(company.formsCompleted / company.totalForms) * 100}%` }}
+                        style={{ width: `${(Project.formsCompleted / Project.totalForms) * 100}%` }}
                       ></div>
                     </div>
-                    <div className="company-footer">
-                      <span>📊 {Math.round((company.formsCompleted / company.totalForms) * 100)}% complete</span>
-                      <span>📅 {company.lastActivity}</span>
+                    <div className="Project-footer">
+                      <span>📊 {Math.round((Project.formsCompleted / Project.totalForms) * 100)}% complete</span>
+                      <span>📅 {Project.lastActivity}</span>
                     </div>
 
                     <div className="stage-management">
                       <h4>Stage Management:</h4>
                       <div className="stages-row">
                         {[1, 2, 3, 4, 5, 6].map((stage) => {
-                          const stageStatus = getStageStatus(company, stage)
+                          const stageStatus = getStageStatus(Project, stage)
                           return (
                             <div key={stage} className={`stage-item ${stageStatus}`}>
                               <div className="stage-number">{stage}</div>
@@ -935,7 +1006,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleReviewStage(company, stage)
+                                    handleReviewStage(Project, stage)
                                   }}
                                   className="review-stage-btn"
                                 >
@@ -948,11 +1019,11 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                       </div>
                     </div>
 
-                    <div className="company-actions" style={{ marginTop: "15px", display: "flex", gap: "10px" }}>
+                    <div className="Project-actions" style={{ marginTop: "15px", display: "flex", gap: "10px" }}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleViewSubmittedForms(company)
+                          handleViewSubmittedForms(Project)
                         }}
                         className="view-forms-btn"
                         style={{
@@ -972,17 +1043,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          const nextStage = company.stage
-                          const canSubmit = nextStage === 1 || company.stageApprovals[nextStage - 1]
-                          if (canSubmit && !company.submittedStages[nextStage]) {
-                            setFormStageCompany(company)
-                            setFormStageStage(nextStage)
-                            setShowFormStage(true)
-                          } else if (company.submittedStages[nextStage]) {
-                            alert(`Stage ${nextStage} forms already submitted!`)
-                          } else {
-                            alert(`Stage ${nextStage - 1} must be approved first!`)
-                          }
+                          handleStageSubmit(Project)
                         }}
                         className="submit-test-btn"
                         style={{
@@ -997,7 +1058,7 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
                           transition: "all 0.3s ease",
                         }}
                       >
-                        📝 Submit Stage {company.stage}
+                        📝 Submit Stage {Project.stage}
                       </button>
                     </div>
                   </div>
@@ -1014,6 +1075,179 @@ const ETCAdminPanel = ({ user, selectedProject, onLogout, onProjectSelect, onCom
           </div>
         </div>
       </main>
+
+      {/* Notification Modal */}
+      {showNotificationModal && (
+        <div className="modal-overlay" onClick={() => setShowNotificationModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {notificationType === "success" && <span style={{ fontSize: "1.5rem" }}>✅</span>}
+                {notificationType === "error" && <span style={{ fontSize: "1.5rem" }}>❌</span>}
+                {notificationType === "warning" && <span style={{ fontSize: "1.5rem" }}>⚠️</span>}
+                {notificationType === "info" && <span style={{ fontSize: "1.5rem" }}>ℹ️</span>}
+                <h3>
+                  {notificationType === "success" && "Success"}
+                  {notificationType === "error" && "Error"}
+                  {notificationType === "warning" && "Warning"}
+                  {notificationType === "info" && "Information"}
+                </h3>
+              </div>
+            </div>
+            <p style={{ fontSize: "1.1rem", lineHeight: "1.6", margin: "20px 0" }}>{notificationMessage}</p>
+            <div className="modal-actions">
+              <button onClick={() => setShowNotificationModal(false)} className="submit-btn">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal-overlay" onClick={() => setShowConfirmModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "1.5rem" }}>❓</span>
+                <h3>Confirmation</h3>
+              </div>
+            </div>
+            <p style={{ fontSize: "1.1rem", lineHeight: "1.6", margin: "20px 0" }}>{confirmMessage}</p>
+            <div className="modal-actions">
+              <button
+                onClick={() => {
+                  if (confirmAction) confirmAction()
+                  setShowConfirmModal(false)
+                  setConfirmAction(null)
+                }}
+                className="submit-btn"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false)
+                  setConfirmAction(null)
+                }}
+                className="cancel-btn"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Input Modal */}
+      {showInputModal && (
+        <div className="modal-overlay" onClick={() => setShowInputModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "1.5rem" }}>✏️</span>
+                <h3>{inputModalTitle}</h3>
+              </div>
+            </div>
+            <div className="form-group">
+              <input
+                type="text"
+                placeholder={inputModalPlaceholder}
+                value={inputModalValue}
+                onChange={(e) => setInputModalValue(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter" && inputModalValue.trim()) {
+                    if (inputModalAction) inputModalAction(inputModalValue.trim())
+                    setShowInputModal(false)
+                    setInputModalAction(null)
+                    setInputModalValue("")
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={() => {
+                  if (inputModalValue.trim() && inputModalAction) {
+                    inputModalAction(inputModalValue.trim())
+                  }
+                  setShowInputModal(false)
+                  setInputModalAction(null)
+                  setInputModalValue("")
+                }}
+                className="submit-btn"
+                disabled={!inputModalValue.trim()}
+              >
+                Submit
+              </button>
+              <button
+                onClick={() => {
+                  setShowInputModal(false)
+                  setInputModalAction(null)
+                  setInputModalValue("")
+                }}
+                className="cancel-btn"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Modal */}
+      {showRejectionModal && (
+        <div className="modal-overlay" onClick={() => setShowRejectionModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "1.5rem" }}>❌</span>
+                <h3>Reject Stage {rejectionStage}</h3>
+              </div>
+            </div>
+            <p style={{ fontSize: "1rem", color: "#666", marginBottom: "20px" }}>
+              Please provide a detailed reason for rejecting this stage. This will help the submitter understand what
+              needs to be corrected.
+            </p>
+            <div className="form-group">
+              <label>Rejection Reason *</label>
+              <textarea
+                placeholder="Enter detailed reason for rejection..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows="4"
+                style={{ minHeight: "120px" }}
+                required
+              />
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={confirmRejectStage}
+                className="reject-stage-btn"
+                disabled={!rejectionReason.trim()}
+                style={{
+                  background: rejectionReason.trim() ? "linear-gradient(135deg, #f44336, #d32f2f)" : "#ccc",
+                  cursor: rejectionReason.trim() ? "pointer" : "not-allowed",
+                }}
+              >
+                Confirm Rejection
+              </button>
+              <button
+                onClick={() => {
+                  setShowRejectionModal(false)
+                  setRejectionStage(null)
+                  setRejectionReason("")
+                }}
+                className="cancel-btn"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
